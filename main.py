@@ -17,14 +17,11 @@ async def verify_dl(file: UploadFile = File(...)):
     temp_filename = f"temp_{uuid.uuid4()}.{file_ext}"
     
     try:
-        with open(temp_filename, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-        # 2. Run OpenBharatOCR
-        # The library returns a dict like {'name': '...', 'license_number': '...'}
+        # NOTE: The library uses British spelling 'licence' with a 'c'
         data = openbharatocr.driving_licence(temp_filename)
         
-        # 3. Basic Validation Logic
+        # Check if data was actually found
+        # The library returns 'license_number' (with 's') in the dictionary keys
         if not data or not data.get('license_number'):
             return {"valid": False, "message": "Could not read License Number"}
             
