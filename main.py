@@ -36,15 +36,15 @@ async def verify_document(
 
         if doc_type_upper in ["DL", "DRIVING_LICENSE", "LICENSE"]:
             data = openbharatocr.driving_licence(temp_file_path)
-            key_check = 'license_number'
+            key_check = 'Driving Licence Number'
             
         elif doc_type_upper == "PAN":
             data = openbharatocr.pan(temp_file_path)
-            key_check = 'pan_number'
+            key_check = 'Pan Number'
             
         elif doc_type_upper == "AADHAAR":
             data = openbharatocr.front_aadhaar(temp_file_path)
-            key_check = 'aadhaar_number'
+            key_check = 'Aadhaar Number'
             
         else:
             return {
@@ -71,7 +71,7 @@ async def verify_document(
         }
 
     except Exception as e:
-        return {"valid": False, "error": str(e)}
+        return {"valid": False, "error": str(e), "err": "Exception occurred during processing."}
 
     finally:
         # 5. Cleanup
