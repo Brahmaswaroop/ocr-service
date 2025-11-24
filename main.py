@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 import openbharatocr
 import shutil
 import os
@@ -10,40 +10,70 @@ app = FastAPI()
 def home():
     return {"status": "OCR Service is Running"}
 
-@app.post("/verify-dl")
-async def verify_dl(file: UploadFile = File(...)):
-    # 1. Create an ABSOLUTE path in the /tmp folder
-    # This fixes the "No such file" error on Render/Linux
+@app.post("/verify")
+async def verify_document(
+    file: UploadFile = File(...), 
+    document_type: str = Form(...) # New parameter for 'PAN', 'AADHAAR', or 'DL'
+):
+    # 1. Setup paths
     file_ext = file.filename.split(".")[-1]
     safe_filename = f"{uuid.uuid4()}.{file_ext}"
     temp_file_path = os.path.join("/tmp", safe_filename)
     
     try:
-        # 2. Save the uploaded file to the absolute path
+        # 2. Save file
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-            
-        # 3. Verify file exists before calling the library (Debugging)
-        if not os.path.exists(temp_file_path):
-            return {"valid": False, "error": "File failed to save to disk"}
 
-        # 4. Run OpenBharatOCR with the FULL PATH
-        # Note: 'driving_licence' is the British spelling used by the library
-        data = openbharatocr.driving_licence(temp_file_path)
+        if not os.path.exists(temp_file_path):
+            return {"valid": False, "error": "File save failed"}
+
+        # 3. Route logic based on Document Type
+        data = {}
+        doc_type_upper = document_type.upper().strip()
         
-        if not data or not data.get('license_number'):
-            return {"valid": False, "message": "Could not read License Number"}
+        print(f"Processing {doc_type_upper}...") # Log for debugging
+
+        if doc_type_upper in ["DL", "DRIVING_LICENSE", "LICENSE"]:
+            data = openbharatocr.driving_licence(temp_file_path)
+            key_check = 'license_number'
             
+        elif doc_type_upper == "PAN":
+            data = openbharatocr.pan(temp_file_path)
+            key_check = 'pan_number'
+            
+        elif doc_type_upper == "AADHAAR":
+            data = openbharatocr.aadhaar(temp_file_path)
+            key_check = 'aadhaar_number'
+            
+        else:
+            return {
+                "valid": False, 
+                "error": f"Unsupported document type: {document_type}. Use 'PAN', 'AADHAAR', or 'DL'."
+            }
+
+        # 4. Validation
+        print(f"Raw Data: {data}") # Debug log
+
+        # If data is empty or the specific ID number is missing
+        if not data or not data.get(key_check):
+            return {
+                "valid": False, 
+                "message": f"Could not read {doc_type_upper} Number. Image might be blurry.",
+                "extracted_raw": data 
+            }
+
         return {
             "valid": True,
+            "document_type": doc_type_upper,
             "data": data,
             "source": "OpenBharatOCR"
         }
 
     except Exception as e:
         return {"valid": False, "error": str(e)}
-    
+
     finally:
-        # 5. Cleanup: Delete the temp file
+        # 5. Cleanup
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
