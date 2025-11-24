@@ -1,9 +1,7 @@
-# Use a lightweight Python base image
+# Use Python 3.10 slim (Good balance of size and compatibility)
 FROM python:3.10-slim
 
-# 1. Install System Dependencies (UPDATED)
-# 'libgl1-mesa-glx' is removed in modern Debian. 
-# We use 'libgl1' and 'libglib2.0-0' which are required for OpenCV/OCR.
+# 1. Install System Dependencies (Fixes "libGL.so.1" and "libgomp" errors)
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-eng \
@@ -12,12 +10,15 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
+    libxrender-dev \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Set working directory
 WORKDIR /app
 
-# 3. Copy dependencies and install
+# 3. Copy requirements and install
+# We use --no-cache-dir to keep the image smaller
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
