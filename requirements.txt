@@ -1,0 +1,7 @@
+fastapi==0.109.0
+uvicorn==0.27.0
+python-multipart==0.0.9
+openbharatocr==0.4.3
+numpy
+opencv-python-headless
+pillow
