@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File
 import openbharatocr
 import shutil
 import os
@@ -12,16 +12,25 @@ def home():
 
 @app.post("/verify-dl")
 async def verify_dl(file: UploadFile = File(...)):
-    # 1. Save upload to a temp file
+    # 1. Create an ABSOLUTE path in the /tmp folder
+    # This fixes the "No such file" error on Render/Linux
     file_ext = file.filename.split(".")[-1]
-    temp_filename = f"temp_{uuid.uuid4()}.{file_ext}"
+    safe_filename = f"{uuid.uuid4()}.{file_ext}"
+    temp_file_path = os.path.join("/tmp", safe_filename)
     
     try:
-        # NOTE: The library uses British spelling 'licence' with a 'c'
-        data = openbharatocr.driving_licence(temp_filename)
+        # 2. Save the uploaded file to the absolute path
+        with open(temp_file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        # 3. Verify file exists before calling the library (Debugging)
+        if not os.path.exists(temp_file_path):
+            return {"valid": False, "error": "File failed to save to disk"}
+
+        # 4. Run OpenBharatOCR with the FULL PATH
+        # Note: 'driving_licence' is the British spelling used by the library
+        data = openbharatocr.driving_licence(temp_file_path)
         
-        # Check if data was actually found
-        # The library returns 'license_number' (with 's') in the dictionary keys
         if not data or not data.get('license_number'):
             return {"valid": False, "message": "Could not read License Number"}
             
@@ -35,6 +44,6 @@ async def verify_dl(file: UploadFile = File(...)):
         return {"valid": False, "error": str(e)}
     
     finally:
-        # 4. Cleanup: Delete temp file
-        if os.path.exists(temp_filename):
-            os.remove(temp_filename)
+        # 5. Cleanup: Delete the temp file
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
