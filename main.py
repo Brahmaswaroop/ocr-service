@@ -43,7 +43,7 @@ async def verify_document(
             key_check = 'pan_number'
             
         elif doc_type_upper == "AADHAAR":
-            data = openbharatocr.aadhaar(temp_file_path)
+            data = openbharatocr.front_aadhaar(temp_file_path)
             key_check = 'aadhaar_number'
             
         else:
