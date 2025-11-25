@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.concurrency import run_in_executor
+# FIX: Import from starlette, as it was removed from fastapi.concurrency
+from starlette.concurrency import run_in_executor 
 import openbharatocr
 import shutil
 import os
@@ -7,7 +8,6 @@ import uuid
 import tempfile
 import cv2
 import numpy as np
-import math
 
 app = FastAPI()
 
@@ -74,7 +74,6 @@ def preprocess_image_optimized(input_path: str) -> str:
         raise RuntimeError(f"Could not read image: {input_path}")
 
     # 1. Smart Resizing: Limit max dimension to 1800px to speed up OCR
-    # while keeping it large enough for reading.
     height, width = img.shape[:2]
     max_dim = 1800
     if max(height, width) > max_dim:
@@ -93,15 +92,11 @@ def preprocess_image_optimized(input_path: str) -> str:
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # 4. Denoise (Faster than Bilateral)
-    # usage of fastNlMeansDenoising is excellent for text documents
     denoised = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
 
-    # 5. CLAHE (Contrast Enhancement) - vital for watermarked Indian IDs
+    # 5. CLAHE (Contrast Enhancement)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(denoised)
-
-    # Note: We DO NOT apply adaptiveThreshold here. 
-    # We let the OCR engine handle the final binarization decision.
     
     processed_path = f"{input_path}_proc.png"
     cv2.imwrite(processed_path, enhanced)
@@ -124,11 +119,11 @@ async def verify_document(
 
     try:
         # Save file
+        # shutil.copyfileobj is synchronous, but okay for small files in this context.
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
         # --- CPU BOUND OPERATION ---
-        # Run preprocessing in a separate thread to avoid blocking the API
         processed_path = await run_in_executor(None, preprocess_image_optimized, temp_file_path)
         
         doc_type_upper = document_type.upper().strip()
@@ -150,7 +145,6 @@ async def verify_document(
             return {"valid": False, "error": "Unsupported document type."}
 
         # --- CPU BOUND OPERATION ---
-        # Run OCR in thread pool
         data = await run_in_executor(None, ocr_func, processed_path)
 
         print(f"Extracted: {data}")
@@ -169,6 +163,8 @@ async def verify_document(
         }
 
     except Exception as e:
+        import traceback
+        traceback.print_exc() # Print full error to logs
         return {"valid": False, "error": str(e), "err": "Exception occurred during processing."}
 
     finally:

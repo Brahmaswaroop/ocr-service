@@ -5,3 +5,5 @@ requests
 openbharatocr
 pydantic
 tensorflow-cpu
+numpy
+opencv-python-headless
