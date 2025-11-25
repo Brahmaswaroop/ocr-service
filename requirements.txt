@@ -7,3 +7,5 @@ pydantic
 tensorflow-cpu
 numpy
 opencv-python-headless
+pillow
+python-dateutil 
