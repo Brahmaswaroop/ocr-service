@@ -9,3 +9,6 @@ numpy
 opencv-python-headless
 pillow
 python-dateutil 
+transformers>=4.23.0
+torch
+sentencepiece
